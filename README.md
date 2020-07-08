@@ -1,6 +1,6 @@
 # harbor-api
 
-This is a simaple and easy way for you to use the api of the harbor in go.
+This is a simple and easy way for you to interact with Harbor.
 
 ### notice
 * The structures inside the harbor_types.go were all copied from github.com/goharbor/harbor/src/common/models.
