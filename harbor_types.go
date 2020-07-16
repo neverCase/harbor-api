@@ -23,7 +23,7 @@ type Project struct {
 
 // RepoRecord holds the record of an repository in DB, all the infors are from the registry notification event.
 type RepoRecord struct {
-	RepositoryID int64     `orm:"pk;auto;column(repository_id)" json:"repository_id"`
+	RepositoryID int64     `orm:"pk;auto;column(repository_id)" json:"id"`
 	Name         string    `orm:"column(name)" json:"name"`
 	ProjectID    int64     `orm:"column(project_id)"  json:"project_id"`
 	Description  string    `orm:"column(description)" json:"description"`
