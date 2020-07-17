@@ -5,6 +5,7 @@ type HubGetter interface {
 }
 
 type HubInterface interface {
+	List() []string
 	Get(url string) HarborInterface
 }
 
@@ -26,6 +27,14 @@ func NewHub(c []Config) HubInterface {
 		h.harbors[v.Url] = NewHarbor(v.Url, v.Admin, v.Password)
 	}
 	return h
+}
+
+func (h *hub) List() []string {
+	res := make([]string, 0)
+	for k := range h.harbors {
+		res = append(res, k)
+	}
+	return res
 }
 
 func (h *hub) Get(url string) HarborInterface {
