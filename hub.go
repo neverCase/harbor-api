@@ -1,13 +1,7 @@
 package harbor_api
 
-type Config struct {
-	Url      string `json:"url"`
-	Admin    string `json:"admin"`
-	Password string `json:"password"`
-}
-
 type HubGetter interface {
-	Hub() HarborInterface
+	Hub() HubInterface
 }
 
 type HubInterface interface {
@@ -16,6 +10,12 @@ type HubInterface interface {
 
 type hub struct {
 	harbors map[string]HarborInterface
+}
+
+type Config struct {
+	Url      string `json:"url"`
+	Admin    string `json:"admin"`
+	Password string `json:"password"`
 }
 
 func NewHub(c []Config) HubInterface {
