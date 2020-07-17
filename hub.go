@@ -1,7 +1,7 @@
 package harbor_api
 
 type HubGetter interface {
-	Hub() HubInterface
+	HarborHub() HubInterface
 }
 
 type HubInterface interface {
