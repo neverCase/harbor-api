@@ -20,6 +20,7 @@ type HarborInterface interface {
 	Projects() (res []Project, err error)
 	Repositories(projectId int) (res []RepoRecord, err error)
 	Tags(imageName string) (res []TagDetail, err error)
+	TagOne(imageName, tagName string) (res TagDetail, err error)
 }
 
 func NewHarbor(url, admin, password string) HarborInterface {
@@ -46,6 +47,7 @@ const (
 	Projects     HarborUrlSuffix = "api/projects"                         // api/projects?page=1&page_size=15
 	Repositories HarborUrlSuffix = "api/repositories?&project_id=%d"      // api/repositories?page=1&page_size=15&project_id=2
 	Tags         HarborUrlSuffix = "api/repositories/%s/tags?detail=true" // api/repositories/helix-saga/redis-slave/tags?detail=true
+	TagOne       HarborUrlSuffix = "api/repositories/%s/tags/%s"          // api/repositories/helix-saga/go-all/tags/latest
 )
 
 func (h *harbor) Http(method string, url string) (res *http.Response, err error) {
@@ -145,6 +147,34 @@ func (h *harbor) Tags(imageName string) (res []TagDetail, err error) {
 		resp   *http.Response
 	)
 	suffix = fmt.Sprintf(string(Tags), imageName)
+	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
+		return res, err
+	}
+	if resp.StatusCode == http.StatusOK {
+		cont, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			klog.V(2).Info(err)
+			return res, err
+		}
+		if err = resp.Body.Close(); err != nil {
+			klog.V(2).Info(err)
+			return res, err
+		}
+		if err = json.Unmarshal(cont, &res); err != nil {
+			klog.V(2).Info(err)
+			return res, err
+		}
+	}
+	klog.Info(res)
+	return res, nil
+}
+
+func (h *harbor) TagOne(imageName, tagName string) (res TagDetail, err error) {
+	var (
+		suffix string
+		resp   *http.Response
+	)
+	suffix = fmt.Sprintf(string(TagOne), imageName, tagName)
 	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
 		return res, err
 	}
