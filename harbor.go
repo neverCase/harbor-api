@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/klog"
 )
 
@@ -21,6 +22,7 @@ type HarborInterface interface {
 	Repositories(projectId int) (res []RepoRecord, err error)
 	Tags(imageName string) (res []TagDetail, err error)
 	TagOne(imageName, tagName string) (res TagDetail, err error)
+	Watch(opt Option) watch.Interface
 }
 
 func NewHarbor(url, admin, password string) HarborInterface {
@@ -195,4 +197,8 @@ func (h *harbor) TagOne(imageName, tagName string) (res TagDetail, err error) {
 	}
 	klog.Info(res)
 	return res, nil
+}
+
+func (h *harbor) Watch(opt Option) watch.Interface {
+	return NewWatch(h, opt)
 }
