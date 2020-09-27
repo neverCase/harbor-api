@@ -19,3 +19,6 @@ h := NewHarbor(url, admin, password)
 res, err := h.Projects()
 ...
 ```
+
+## Todo
+* add api pagination in the future

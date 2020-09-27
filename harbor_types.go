@@ -51,3 +51,9 @@ type TagDetail struct {
 type TagCfg struct {
 	Labels map[string]string `json:"labels"`
 }
+
+// ErrorResponse
+type ErrorResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
