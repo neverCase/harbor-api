@@ -1,6 +1,7 @@
 package harbor_api
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -22,16 +23,18 @@ type HarborInterface interface {
 	Repositories(projectId int) (res []RepoRecord, err error)
 	Tags(imageName string) (res []TagDetail, err error)
 	TagOne(imageName, tagName string) (res TagDetail, err error)
-	Watch(opt Option) watch.Interface
+	Watch(opt Option) (watch.Interface, error)
 }
 
 func NewHarbor(url, admin, password string) HarborInterface {
-	return &harbor{
+	h := &harbor{
 		url:      url,
 		admin:    admin,
 		password: password,
 		timeout:  10,
 	}
+	h.images = NewImages(context.Background(), h.TagOne)
+	return h
 }
 
 type harbor struct {
@@ -39,6 +42,8 @@ type harbor struct {
 	admin    string
 	password string
 	timeout  int
+
+	images Images
 }
 
 type HarborUrlSuffix string
@@ -195,10 +200,15 @@ func (h *harbor) TagOne(imageName, tagName string) (res TagDetail, err error) {
 			return res, err
 		}
 	}
-	klog.Info(res)
+	//klog.Info(res)
 	return res, nil
 }
 
-func (h *harbor) Watch(opt Option) watch.Interface {
-	return NewWatch(h, opt)
+func (h *harbor) Watch(opt Option) (watch.Interface, error) {
+	image, err := h.images.Image(opt)
+	if err != nil {
+		klog.V(2).Info(err)
+		return nil, err
+	}
+	return image.Watch(), nil
 }

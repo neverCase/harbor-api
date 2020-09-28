@@ -2,11 +2,12 @@ package harbor_api
 
 import (
 	"context"
-	"k8s.io/klog"
+	"fmt"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/klog"
 )
 
 const (
@@ -15,33 +16,6 @@ const (
 	loopTickTimeInMs = 500
 )
 
-// NewWatch returns a k8s.io watch.Interface
-func NewWatch(h *harbor, opt Option) watch.Interface {
-	return &harborWatch{
-		h:      h,
-		opt:    opt,
-		result: make(chan watch.Event, 1000),
-	}
-}
-
-// harborWatch implements the k8s.io/apimachinery/pkg/watch.Interface
-type harborWatch struct {
-	h      *harbor
-	opt    Option
-	result chan watch.Event
-
-	mu     sync.RWMutex
-	images map[string]*image
-}
-
-func (w *harborWatch) Stop() {
-
-}
-
-func (w *harborWatch) ResultChan() <-chan watch.Event {
-	return w.result
-}
-
 type RequestHandler func(imageName, tag string) (res TagDetail, err error)
 
 type Images interface {
@@ -49,7 +23,7 @@ type Images interface {
 }
 
 type images struct {
-	mu sync.RWMutex
+	mu sync.Mutex
 
 	images      map[string]Image
 	removedChan chan string
@@ -149,12 +123,15 @@ func (i *image) Loop(removedChan chan<- string) {
 		case <-i.ctx.Done():
 			return
 		case <-tick.C:
-			res, err := i.handler(i.opt.Project, i.opt.Tag)
+			res, err := i.handler(fmt.Sprintf("%s/%s", i.opt.Project, i.opt.Repository), i.opt.Tag)
 			if err != nil {
+				// todo check whether the error was like `{"code":404,"message":"resource: xxxxx not found"}`
 				klog.V(2).Info(err)
 				select {
 				case removedChan <- i.opt.ImageName():
+					klog.Infof("Loop send removedChan:%s success", i.opt.ImageName())
 				case <-time.After(time.Second * 1):
+					klog.Infof("Loop send removedChan:%s timout", i.opt.ImageName())
 				}
 				continue
 			}
