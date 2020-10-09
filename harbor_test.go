@@ -31,15 +31,15 @@ func TestNewHarbor(t *testing.T) {
 		args args
 		want HarborInterface
 	}{
-		{
-			name: "NewHarbor_case1",
-			args: args{
-				url:      fc.url,
-				admin:    fc.admin,
-				password: fc.password,
-			},
-			want: NewHarbor(fc.url, fc.admin, fc.password),
-		},
+		//{
+		//	name: "NewHarbor_case1",
+		//	args: args{
+		//		url:      fc.url,
+		//		admin:    fc.admin,
+		//		password: fc.password,
+		//	},
+		//	want: NewHarbor(fc.url, fc.admin, fc.password),
+		//},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -3,6 +3,7 @@ package harbor_api
 import (
 	"fmt"
 	"testing"
+	"time"
 )
 
 func TestWatch(t *testing.T) {
@@ -31,7 +32,9 @@ func TestWatch(t *testing.T) {
 				fmt.Println("ResultChan close")
 			}
 			fmt.Println("obj:", obj)
+		case <-time.After(time.Second * 3):
+			fmt.Println("graceful stop after 3 seconds")
+			return
 		}
 	}
-
 }

@@ -1,12 +1,24 @@
 package harbor_api
 
+import (
+	"fmt"
+	"regexp"
+)
+
+const (
+	ErrorHarborUrlWasNotExisted = "error: the harbor url:%s was not existed"
+
+	HttpPrefix  = "http://"
+	HttpsPrefix = "https://"
+)
+
 type HubGetter interface {
 	HarborHub() HubInterface
 }
 
 type HubInterface interface {
 	List() []string
-	Get(url string) HarborInterface
+	Get(url string) (HarborInterface, error)
 }
 
 type hub struct {
@@ -37,6 +49,26 @@ func (h *hub) List() []string {
 	return res
 }
 
-func (h *hub) Get(url string) HarborInterface {
-	return h.harbors[url]
+func (h *hub) Get(url string) (HarborInterface, error) {
+	s := ConvertUrlToHttp(url)
+	if t, ok := h.harbors[s]; ok {
+		return t, nil
+	}
+	s = ConvertUrlToHttps(url)
+	if t, ok := h.harbors[s]; ok {
+		return t, nil
+	}
+	return nil, fmt.Errorf(ErrorHarborUrlWasNotExisted, url)
+}
+
+func ConvertUrlToHttp(in string) string {
+	re := regexp.MustCompile(fmt.Sprintf(`%s|%s`, HttpPrefix, HttpsPrefix))
+	out := re.ReplaceAll([]byte(in), []byte(HttpPrefix))
+	return string(out)
+}
+
+func ConvertUrlToHttps(in string) string {
+	re := regexp.MustCompile(fmt.Sprintf(`%s|%s`, HttpPrefix, HttpsPrefix))
+	out := re.ReplaceAll([]byte(in), []byte(HttpsPrefix))
+	return string(out)
 }
