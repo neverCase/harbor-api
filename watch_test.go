@@ -38,3 +38,29 @@ func TestWatch(t *testing.T) {
 		}
 	}
 }
+
+func TestGetHashFromDockerImageId(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "TestGetHashFromDockerImageId_1",
+			args: args{
+				s: "docker-pullable://harbor.domain.com/helix-saga/go-all@sha256:27d6aa8f9d040c5e85c61a093ad2dc769e57440e8240c3294f47093e97d96c9a",
+			},
+			want: "sha256:27d6aa8f9d040c5e85c61a093ad2dc769e57440e8240c3294f47093e97d96c9a",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetHashFromDockerImageId(tt.args.s); got != tt.want {
+				t.Errorf("GetHashFromDockerImageId() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -3,6 +3,7 @@ package harbor_api
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -135,8 +136,8 @@ func (i *image) Loop(removedChan chan<- string) {
 				}
 				continue
 			}
-			if i.opt.sha256 == "" || res.Digest != i.opt.sha256 {
-				i.opt.sha256 = res.Digest
+			if i.opt.Sha256 == "" || res.Digest != i.opt.Sha256 {
+				i.opt.Sha256 = res.Digest
 				i.broadcasters.Action(watch.Modified, i.opt)
 			}
 		}
@@ -156,6 +157,10 @@ func (i *image) Shutdown() {
 
 // image: harbor.domain.com/helix-saga/go-all:latest
 // imageID: docker-pullable://harbor.domain.com/helix-saga/go-all@sha256:27d6aa8f9d040c5e85c61a093ad2dc769e57440e8240c3294f47093e97d96c9a
-func ConvertDockerImageIdToHarbor(s string) {
-
+func GetHashFromDockerImageId(s string) string {
+	t := strings.Split(s, "@")
+	if len(t) != 2 {
+		return ""
+	}
+	return t[1]
 }

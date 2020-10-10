@@ -14,7 +14,7 @@ type Option struct {
 	Project     string
 	Repository  string
 	Tag         string
-	sha256      string
+	Sha256      string
 	ExpiredTime int64
 }
 
