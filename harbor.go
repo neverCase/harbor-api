@@ -9,7 +9,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 type HarborGetter interface {

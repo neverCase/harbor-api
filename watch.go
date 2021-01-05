@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 )
 
 const (
