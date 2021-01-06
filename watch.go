@@ -3,6 +3,7 @@ package harbor_api
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"time"
@@ -14,7 +15,7 @@ import (
 const (
 	maxQueuedEvents  = 1000
 	maxRemovedChan   = 1000
-	loopTickTimeInMs = 500
+	loopTickTimeInMs = 1500
 )
 
 type RequestHandler func(imageName, tag string) (res TagDetail, err error)
@@ -124,6 +125,8 @@ func (i *image) Loop(removedChan chan<- string) {
 		case <-i.ctx.Done():
 			return
 		case <-tick.C:
+			rand.Seed(time.Now().UnixNano())
+			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
 			res, err := i.handler(fmt.Sprintf("%s/%s", i.opt.Project, i.opt.Repository), i.opt.Tag)
 			if err != nil {
 				// todo check whether the error was like `{"code":404,"message":"resource: xxxxx not found"}`
