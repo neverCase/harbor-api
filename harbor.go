@@ -133,7 +133,6 @@ func (h *harbor) Projects() (res []models.Project, err error) {
 			return res, err
 		}
 	}
-	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
@@ -161,7 +160,6 @@ func (h *harbor) Repositories(projectName string) (res []models.RepoRecord, err 
 			return res, err
 		}
 	}
-	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
@@ -189,35 +187,18 @@ func (h *harbor) Artifacts(projectName string, repositoryName string) (res []art
 			return res, err
 		}
 	}
-	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
 func (h *harbor) Tags(projectName string, repositoryName string) (res []*tag.Tag, err error) {
-	var (
-		suffix string
-		resp   *http.Response
-	)
-	suffix = fmt.Sprintf(string(Tags), projectName)
-	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
-		return res, err
+	data, err := h.Artifacts(projectName, repositoryName)
+	if err != nil {
+		return nil, err
 	}
-	if resp.StatusCode == http.StatusOK {
-		cont, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			zaplogger.Sugar().Error(err)
-			return res, err
-		}
-		if err = resp.Body.Close(); err != nil {
-			zaplogger.Sugar().Error(err)
-			return res, err
-		}
-		if err = json.Unmarshal(cont, &res); err != nil {
-			zaplogger.Sugar().Error(err)
-			return res, err
-		}
+	res = make([]*tag.Tag, 0)
+	for _, v := range data {
+		res = append(res, v.Tags...)
 	}
-	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
