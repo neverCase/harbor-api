@@ -3,13 +3,17 @@ package harbor_api
 import (
 	"context"
 	"fmt"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
+	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/controller/artifact"
+	"github.com/goharbor/harbor/src/controller/tag"
 	"io/ioutil"
-	"net/http"
-	"time"
-
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/klog/v2"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 )
 
 type HarborGetter interface {
@@ -19,9 +23,10 @@ type HarborGetter interface {
 type HarborInterface interface {
 	Http(method string, url string) (res *http.Response, err error)
 	Login() error
-	Projects() (res []Project, err error)
-	Repositories(projectId int) (res []RepoRecord, err error)
-	Tags(imageName string) (res []TagDetail, err error)
+	Projects() (res []models.Project, err error)
+	Repositories(projectName string) (res []models.RepoRecord, err error)
+	Artifacts(projectName string, repositoryName string) (res []artifact.Artifact, err error)
+	Tags(projectName string, repositoryName string) (res []*tag.Tag, err error)
 	TagOne(imageName, tagName string) (res TagDetail, err error)
 	Watch(opt Option) (watch.Interface, error)
 }
@@ -49,18 +54,20 @@ type harbor struct {
 type HarborUrlSuffix string
 
 const (
-	Login        HarborUrlSuffix = "login"
+	Login        HarborUrlSuffix = "c/login"
 	SystemInfo   HarborUrlSuffix = "api/systeminfo"
-	Projects     HarborUrlSuffix = "api/projects"                         // api/projects?page=1&page_size=15
-	Repositories HarborUrlSuffix = "api/repositories?&project_id=%d"      // api/repositories?page=1&page_size=15&project_id=2
+	Projects     HarborUrlSuffix = "api/v2.0/projects?page=1&page_size=55&with_detail=true"
+	Repositories HarborUrlSuffix = "api/v2.0/projects/%s/repositories?page=1&page_size=50"
+	Artifacts    HarborUrlSuffix = "api/v2.0/projects/%s/repositories/%s/artifacts?with_tag=true&page_size=50&page=1"
 	Tags         HarborUrlSuffix = "api/repositories/%s/tags?detail=true" // api/repositories/helix-saga/redis-slave/tags?detail=true
 	TagOne       HarborUrlSuffix = "api/repositories/%s/tags/%s"          // api/repositories/helix-saga/go-all/tags/latest
 )
 
 func (h *harbor) Http(method string, url string) (res *http.Response, err error) {
+	zaplogger.Sugar().Infow("harbor-api http", "method", method, "url", url)
 	var req *http.Request
 	if req, err = http.NewRequest(method, url, nil); err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return res, err
 	}
 	req.SetBasicAuth(h.admin, h.password)
@@ -68,7 +75,7 @@ func (h *harbor) Http(method string, url string) (res *http.Response, err error)
 		Timeout: time.Second * time.Duration(h.timeout),
 	}
 	if res, err = httpClient.Do(req); err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 	}
 	return res, err
 }
@@ -79,24 +86,34 @@ func (h *harbor) Login() error {
 		resp *http.Response
 		err  error
 	)
-	req, err = http.NewRequest("GET", fmt.Sprintf("%s/%v", h.url, Login), nil)
+	u := fmt.Sprintf("%s/%v", h.url, Login)
+	zaplogger.Sugar().Info("url:", u)
+	data := url.Values{}
+	data.Set("principal", h.admin)
+	data.Set("password", h.password)
+	body := ioutil.NopCloser(strings.NewReader(data.Encode())) // endode v:[body struce]
+	req, err = http.NewRequest("POST", u, body)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return err
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;param=value") // setting post head
 	req.SetBasicAuth(h.admin, h.password)
 	httpClient := http.Client{
 		Timeout: time.Second * time.Duration(h.timeout),
 	}
+	//resp, err = httpClient.PostForm(u, data)
 	resp, err = httpClient.Do(req)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
+		return err
 	}
+	zaplogger.Sugar().Info(resp)
 	_ = resp
 	return err
 }
 
-func (h *harbor) Projects() (res []Project, err error) {
+func (h *harbor) Projects() (res []models.Project, err error) {
 	var resp *http.Response
 	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, Projects)); err != nil {
 		return res, err
@@ -104,75 +121,103 @@ func (h *harbor) Projects() (res []Project, err error) {
 	if resp.StatusCode == http.StatusOK {
 		cont, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = resp.Body.Close(); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = json.Unmarshal(cont, &res); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 	}
-	klog.Info(res)
+	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
-func (h *harbor) Repositories(projectId int) (res []RepoRecord, err error) {
+func (h *harbor) Repositories(projectName string) (res []models.RepoRecord, err error) {
 	var (
 		suffix string
 		resp   *http.Response
 	)
-	suffix = fmt.Sprintf(string(Repositories), projectId)
+	suffix = fmt.Sprintf(string(Repositories), projectName)
 	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
 		return res, err
 	}
 	if resp.StatusCode == http.StatusOK {
 		cont, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = resp.Body.Close(); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = json.Unmarshal(cont, &res); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 	}
-	klog.Info(res)
+	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
-func (h *harbor) Tags(imageName string) (res []TagDetail, err error) {
+func (h *harbor) Artifacts(projectName string, repositoryName string) (res []artifact.Artifact, err error) {
 	var (
 		suffix string
 		resp   *http.Response
 	)
-	suffix = fmt.Sprintf(string(Tags), imageName)
+	suffix = fmt.Sprintf(string(Artifacts), projectName, repositoryName)
 	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
 		return res, err
 	}
 	if resp.StatusCode == http.StatusOK {
 		cont, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = resp.Body.Close(); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = json.Unmarshal(cont, &res); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 	}
-	klog.Info(res)
+	zaplogger.Sugar().Info(res)
+	return res, nil
+}
+
+func (h *harbor) Tags(projectName string, repositoryName string) (res []*tag.Tag, err error) {
+	var (
+		suffix string
+		resp   *http.Response
+	)
+	suffix = fmt.Sprintf(string(Tags), projectName)
+	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
+		return res, err
+	}
+	if resp.StatusCode == http.StatusOK {
+		cont, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			zaplogger.Sugar().Error(err)
+			return res, err
+		}
+		if err = resp.Body.Close(); err != nil {
+			zaplogger.Sugar().Error(err)
+			return res, err
+		}
+		if err = json.Unmarshal(cont, &res); err != nil {
+			zaplogger.Sugar().Error(err)
+			return res, err
+		}
+	}
+	zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
@@ -188,26 +233,26 @@ func (h *harbor) TagOne(imageName, tagName string) (res TagDetail, err error) {
 	if resp.StatusCode == http.StatusOK {
 		cont, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = resp.Body.Close(); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 		if err = json.Unmarshal(cont, &res); err != nil {
-			klog.V(2).Info(err)
+			zaplogger.Sugar().Error(err)
 			return res, err
 		}
 	}
-	//klog.Info(res)
+	//zaplogger.Sugar().Info(res)
 	return res, nil
 }
 
 func (h *harbor) Watch(opt Option) (watch.Interface, error) {
 	image, err := h.images.Image(opt)
 	if err != nil {
-		klog.V(2).Info(err)
+		zaplogger.Sugar().Error(err)
 		return nil, err
 	}
 	return image.Watch(), nil
