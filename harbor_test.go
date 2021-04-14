@@ -488,3 +488,83 @@ func Test_harbor_Watch(t *testing.T) {
 		})
 	}
 }
+
+func Test_harbor_References(t *testing.T) {
+	type fields struct {
+		url      string
+		admin    string
+		password string
+		timeout  int
+		images   Images
+	}
+	type args struct {
+		projectName    string
+		repositoryName string
+		digestOrTag    string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantRes TagDetail
+		wantErr bool
+	}{
+		{
+			name: "References_case1",
+			fields: fields{
+				url:      fc.url,
+				admin:    fc.admin,
+				password: fc.password,
+				timeout:  fc.timeout,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &harbor{
+				url:      tt.fields.url,
+				admin:    tt.fields.admin,
+				password: tt.fields.password,
+				timeout:  tt.fields.timeout,
+				images:   tt.fields.images,
+			}
+			projects, err := h.Projects()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("harbor.Tags() -> h.Projects()  error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(projects) == 0 {
+				//t.Errorf("harbor.Tags() -> h.Projects()  len(projects) == 0")
+				return
+			}
+			repositories, err := h.Repositories(projects[0].Name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("harbor.Tags() -> h.Repositories() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if len(repositories) == 0 {
+				//t.Errorf("harbor.Tags() -> h.Repositories()  len(projects) == 0")
+				return
+			}
+			name := strings.Replace(repositories[0].Name, fmt.Sprintf("%s/", projects[0].Name), "", -1)
+			tags, err := h.Tags(projects[0].Name, name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("harbor.Tags() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			gotRes, err := h.References(projects[0].Name, name, tags[0].Name)
+			if err != nil {
+				t.Errorf("harbor.References() error = %v", err)
+				return
+			}
+			for _, v := range gotRes.Tags {
+				zaplogger.Sugar().Infow("tags", "repository", repositories[0].Name, "tag", v.Tag)
+			}
+			//if !reflect.DeepEqual(gotRes, tt.wantRes) {
+			//	t.Errorf("harbor.References() = %v, want %v", gotRes, tt.wantRes)
+			//}
+		})
+	}
+	zaplogger.Sugar().Infof("Test_harbor_References End \n\n\n")
+}

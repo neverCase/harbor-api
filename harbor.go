@@ -27,6 +27,7 @@ type HarborInterface interface {
 	Repositories(projectName string) (res []models.RepoRecord, err error)
 	Artifacts(projectName string, repositoryName string) (res []artifact.Artifact, err error)
 	Tags(projectName string, repositoryName string) (res []*tag.Tag, err error)
+	References(projectName string, repositoryName string, digestOrTag string) (res artifact.Artifact, err error)
 	TagOne(imageName, tagName string) (res TagDetail, err error)
 	Watch(opt Option) (watch.Interface, error)
 }
@@ -55,12 +56,11 @@ type HarborUrlSuffix string
 
 const (
 	Login        HarborUrlSuffix = "c/login"
-	SystemInfo   HarborUrlSuffix = "api/systeminfo"
 	Projects     HarborUrlSuffix = "api/v2.0/projects?page=1&page_size=55&with_detail=true"
 	Repositories HarborUrlSuffix = "api/v2.0/projects/%s/repositories?page=1&page_size=50"
-	Artifacts    HarborUrlSuffix = "api/v2.0/projects/%s/repositories/%s/artifacts?with_tag=true&page_size=50&page=1"
-	Tags         HarborUrlSuffix = "api/repositories/%s/tags?detail=true" // api/repositories/helix-saga/redis-slave/tags?detail=true
-	TagOne       HarborUrlSuffix = "api/repositories/%s/tags/%s"          // api/repositories/helix-saga/go-all/tags/latest
+	Artifacts    HarborUrlSuffix = "api/v2.0/projects/%s/repositories/%s/artifacts?with_tag=true&with_scan_overview=false&with_label=false&with_immutable_status=false&page_size=50&page=1"
+	References   HarborUrlSuffix = "api/v2.0/projects/%s/repositories/%s/artifacts/%s?with_tag=true&with_scan_overview=false&with_label=false&with_immutable_status=false"
+	TagOne       HarborUrlSuffix = "api/repositories/%s/tags/%s" // api/repositories/helix-saga/go-all/tags/latest
 )
 
 func (h *harbor) Http(method string, url string) (res *http.Response, err error) {
@@ -198,6 +198,33 @@ func (h *harbor) Tags(projectName string, repositoryName string) (res []*tag.Tag
 	res = make([]*tag.Tag, 0)
 	for _, v := range data {
 		res = append(res, v.Tags...)
+	}
+	return res, nil
+}
+
+func (h *harbor) References(projectName string, repositoryName string, digestOrTag string) (res artifact.Artifact, err error) {
+	var (
+		suffix string
+		resp   *http.Response
+	)
+	suffix = fmt.Sprintf(string(References), projectName, repositoryName, digestOrTag)
+	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
+		return res, err
+	}
+	if resp.StatusCode == http.StatusOK {
+		cont, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			zaplogger.Sugar().Error(err)
+			return res, err
+		}
+		if err = resp.Body.Close(); err != nil {
+			zaplogger.Sugar().Error(err)
+			return res, err
+		}
+		if err = json.Unmarshal(cont, &res); err != nil {
+			zaplogger.Sugar().Error(err)
+			return res, err
+		}
 	}
 	return res, nil
 }
