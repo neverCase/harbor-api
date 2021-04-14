@@ -28,7 +28,6 @@ type HarborInterface interface {
 	Artifacts(projectName string, repositoryName string) (res []artifact.Artifact, err error)
 	Tags(projectName string, repositoryName string) (res []*tag.Tag, err error)
 	References(projectName string, repositoryName string, digestOrTag string) (res artifact.Artifact, err error)
-	TagOne(imageName, tagName string) (res TagDetail, err error)
 	Watch(opt Option) (watch.Interface, error)
 }
 
@@ -39,7 +38,7 @@ func NewHarbor(url, admin, password string) HarborInterface {
 		password: password,
 		timeout:  10,
 	}
-	h.images = NewImages(context.Background(), h.TagOne)
+	h.images = NewImages(context.Background(), h.References)
 	return h
 }
 
@@ -226,34 +225,6 @@ func (h *harbor) References(projectName string, repositoryName string, digestOrT
 			return res, err
 		}
 	}
-	return res, nil
-}
-
-func (h *harbor) TagOne(imageName, tagName string) (res TagDetail, err error) {
-	var (
-		suffix string
-		resp   *http.Response
-	)
-	suffix = fmt.Sprintf(string(TagOne), imageName, tagName)
-	if resp, err = h.Http("GET", fmt.Sprintf("%s/%v", h.url, suffix)); err != nil {
-		return res, err
-	}
-	if resp.StatusCode == http.StatusOK {
-		cont, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			zaplogger.Sugar().Error(err)
-			return res, err
-		}
-		if err = resp.Body.Close(); err != nil {
-			zaplogger.Sugar().Error(err)
-			return res, err
-		}
-		if err = json.Unmarshal(cont, &res); err != nil {
-			zaplogger.Sugar().Error(err)
-			return res, err
-		}
-	}
-	//zaplogger.Sugar().Info(res)
 	return res, nil
 }
 

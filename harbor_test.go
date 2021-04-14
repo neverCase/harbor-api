@@ -2,14 +2,15 @@ package harbor_api
 
 import (
 	"fmt"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
+	"github.com/goharbor/harbor/src/common/models"
+	"github.com/goharbor/harbor/src/controller/artifact"
+	"github.com/goharbor/harbor/src/controller/tag"
+	"k8s.io/apimachinery/pkg/watch"
 	"net/http"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/Shanghai-Lunara/pkg/zaplogger"
-	"github.com/goharbor/harbor/src/controller/artifact"
-	"k8s.io/apimachinery/pkg/watch"
 )
 
 type fakeConfig struct {
@@ -104,7 +105,7 @@ func Test_harbor_Projects(t *testing.T) {
 	tests := []struct {
 		name    string
 		fields  fields
-		wantRes []Project
+		wantRes []models.Project
 		wantErr bool
 	}{
 		{
@@ -212,7 +213,7 @@ func Test_harbor_Repositories(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		wantRes []RepoRecord
+		wantRes []models.RepoRecord
 		wantErr bool
 	}{
 		{
@@ -271,7 +272,7 @@ func Test_harbor_Tags(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		wantRes []TagDetail
+		wantRes []*tag.Tag
 		wantErr bool
 	}{
 		{
@@ -406,48 +407,6 @@ func Test_harbor_Artifacts(t *testing.T) {
 	zaplogger.Sugar().Infof("Test_harbor_Artifacts End \n\n\n")
 }
 
-func Test_harbor_TagOne(t *testing.T) {
-	type fields struct {
-		url      string
-		admin    string
-		password string
-		timeout  int
-		images   Images
-	}
-	type args struct {
-		imageName string
-		tagName   string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantRes TagDetail
-		wantErr bool
-	}{
-		// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &harbor{
-				url:      tt.fields.url,
-				admin:    tt.fields.admin,
-				password: tt.fields.password,
-				timeout:  tt.fields.timeout,
-				images:   tt.fields.images,
-			}
-			gotRes, err := h.TagOne(tt.args.imageName, tt.args.tagName)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("harbor.TagOne() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(gotRes, tt.wantRes) {
-				t.Errorf("harbor.TagOne() = %v, want %v", gotRes, tt.wantRes)
-			}
-		})
-	}
-}
-
 func Test_harbor_Watch(t *testing.T) {
 	type fields struct {
 		url      string
@@ -506,7 +465,7 @@ func Test_harbor_References(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		wantRes TagDetail
+		wantRes artifact.Artifact
 		wantErr bool
 	}{
 		{

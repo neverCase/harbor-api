@@ -2,14 +2,13 @@ package harbor_api
 
 import (
 	"context"
-	"fmt"
+	"github.com/Shanghai-Lunara/pkg/zaplogger"
+	"github.com/goharbor/harbor/src/controller/artifact"
+	"k8s.io/apimachinery/pkg/watch"
 	"math/rand"
 	"strings"
 	"sync"
 	"time"
-
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -18,7 +17,7 @@ const (
 	loopTickTimeInMs = 1500
 )
 
-type RequestHandler func(imageName, tag string) (res TagDetail, err error)
+type RequestHandler func(projectName string, repositoryName string, digestOrTag string) (res artifact.Artifact, err error)
 
 type Images interface {
 	Image(opt Option) (Image, error)
@@ -38,32 +37,32 @@ type images struct {
 
 func NewImages(ctx context.Context, handler RequestHandler) Images {
 	subCtx, cancel := context.WithCancel(ctx)
-	is := &images{
+	i := &images{
 		images:      make(map[string]Image, 0),
 		removedChan: make(chan string, maxRemovedChan),
 		handler:     handler,
 		ctx:         subCtx,
 		cancel:      cancel,
 	}
-	go is.Loop()
-	return is
+	go i.Loop()
+	return i
 }
 
-func (is *images) Loop() {
+func (images *images) Loop() {
 	for {
 		select {
-		case name := <-is.removedChan:
-			is.mu.Lock()
-			t, ok := is.images[name]
+		case name := <-images.removedChan:
+			images.mu.Lock()
+			t, ok := images.images[name]
 			if !ok {
-				is.mu.Unlock()
+				images.mu.Unlock()
 				continue
 			}
-			delete(is.images, name)
-			is.mu.Unlock()
+			delete(images.images, name)
+			images.mu.Unlock()
 			t.Shutdown()
-		case <-is.ctx.Done():
-			for _, v := range is.images {
+		case <-images.ctx.Done():
+			for _, v := range images.images {
 				v.Shutdown()
 			}
 			return
@@ -71,17 +70,17 @@ func (is *images) Loop() {
 	}
 }
 
-func (is *images) Image(opt Option) (Image, error) {
-	is.mu.Lock()
-	defer is.mu.Unlock()
-	if t, ok := is.images[opt.ImageName()]; ok {
+func (images *images) Image(opt Option) (Image, error) {
+	images.mu.Lock()
+	defer images.mu.Unlock()
+	if t, ok := images.images[opt.ImageName()]; ok {
 		return t, nil
 	} else {
-		i, err := NewImage(is.ctx, opt, is.removedChan, is.handler)
+		i, err := NewImage(images.ctx, opt, images.removedChan, images.handler)
 		if err != nil {
 			return nil, err
 		}
-		is.images[opt.ImageName()] = i
+		images.images[opt.ImageName()] = i
 		return i, nil
 	}
 }
@@ -127,15 +126,15 @@ func (i *image) Loop(removedChan chan<- string) {
 		case <-tick.C:
 			rand.Seed(time.Now().UnixNano())
 			time.Sleep(time.Duration(rand.Intn(1000)) * time.Millisecond)
-			res, err := i.handler(fmt.Sprintf("%s/%s", i.opt.Project, i.opt.Repository), i.opt.Tag)
+			res, err := i.handler(i.opt.Project, i.opt.Repository, i.opt.Tag)
 			if err != nil {
 				// todo check whether the error was like `{"code":404,"message":"resource: xxxxx not found"}`
-				klog.V(2).Info(err)
+				zaplogger.Sugar().Error(err)
 				select {
 				case removedChan <- i.opt.ImageName():
-					klog.Infof("Loop send removedChan:%s success", i.opt.ImageName())
+					zaplogger.Sugar().Infof("Loop send removedChan:%s success", i.opt.ImageName())
 				case <-time.After(time.Second * 1):
-					klog.Infof("Loop send removedChan:%s timout", i.opt.ImageName())
+					zaplogger.Sugar().Infof("Loop send removedChan:%s timout", i.opt.ImageName())
 				}
 				continue
 			}

@@ -9,13 +9,13 @@ import (
 func TestWatch(t *testing.T) {
 	h := NewHarbor(fc.url, fc.admin, fc.password)
 	opt := Option{
-		Project:    "helix-saga",
-		Repository: "go-all",
+		Project:    "project-1",
+		Repository: "repo-1",
 		Tag:        "latest",
 	}
 
 	// test TagOne
-	tag, err := h.TagOne(fmt.Sprintf("%s/%s", opt.Project, opt.Repository), opt.Tag)
+	tag, err := h.References(opt.Project, opt.Repository, opt.Tag)
 	if err != nil {
 		t.Errorf("harbor.TagOne err:%v", err)
 	}
