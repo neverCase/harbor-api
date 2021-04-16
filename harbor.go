@@ -63,7 +63,7 @@ const (
 )
 
 func (h *harbor) Http(method string, url string) (res *http.Response, err error) {
-	zaplogger.Sugar().Infow("harbor-api http", "method", method, "url", url)
+	zaplogger.Sugar().Debugw("harbor-api http", "method", method, "url", url)
 	var req *http.Request
 	if req, err = http.NewRequest(method, url, nil); err != nil {
 		zaplogger.Sugar().Error(err)
