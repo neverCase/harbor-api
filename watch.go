@@ -138,8 +138,11 @@ func (i *image) Loop(removedChan chan<- string) {
 				}
 				continue
 			}
-			if i.opt.Sha256 != "" && res.Digest != i.opt.Sha256 {
+			if i.opt.Sha256 == "" {
 				i.opt.Sha256 = res.Digest
+				//i.broadcasters.Action(watch.Added, i.opt)
+			}
+			if i.opt.Sha256 != "" && res.Digest != i.opt.Sha256 {
 				i.broadcasters.Action(watch.Modified, i.opt)
 			}
 		}
